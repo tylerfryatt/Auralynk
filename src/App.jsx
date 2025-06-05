@@ -1,3 +1,4 @@
+import React from 'react';
 export default function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-800 via-indigo-900 to-black text-white flex flex-col items-center justify-center p-6">

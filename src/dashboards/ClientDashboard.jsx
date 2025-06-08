@@ -51,16 +51,16 @@ const ClientDashboard = () => {
     const readersWithFilteredSlots = await Promise.all(
       rawData.map(async (reader) => {
         const bookingSnap = await getDocs(
-          query(
-            collection(db, "bookings"),
-            where("readerId", "==", reader.id),
-            where("status", "==", "accepted")
-          )
+          query(collection(db, "bookings"), where("readerId", "==", reader.id))
         );
-        const bookedTimes = bookingSnap.docs.map((d) => d.data().selectedTime);
+        const bookedTimes = bookingSnap.docs
+          .filter((d) => d.data().status !== "rejected")
+          .map((d) => d.data().selectedTime);
+
         const availableSlots = reader.availableSlots.filter(
           (slot) => !bookedTimes.includes(slot)
         );
+
         return { ...reader, availableSlots };
       })
     );

@@ -24,19 +24,29 @@ const BookingPage = () => {
   };
 
   const updateStatus = async (booking, status) => {
-    const bookingRef = doc(db, "bookings", booking.id);
-    await updateDoc(bookingRef, { status });
-    if (status === "accepted") {
-      await updateDoc(doc(db, "users", booking.readerId), {
-        availableSlots: arrayRemove(booking.selectedTime),
-      });
+    try {
+      const bookingRef = doc(db, "bookings", booking.id);
+      await updateDoc(bookingRef, { status });
+      if (status === "accepted") {
+        await updateDoc(doc(db, "users", booking.readerId), {
+          availableSlots: arrayRemove(booking.selectedTime),
+        });
+      }
+      fetchBookings();
+    } catch (err) {
+      console.error("❌ Failed to update booking:", err);
+      alert("Error updating booking. It may have been removed.");
     }
-    fetchBookings();
   };
 
   const deleteBooking = async (bookingId) => {
-    await deleteDoc(doc(db, "bookings", bookingId));
-    fetchBookings();
+    try {
+      await deleteDoc(doc(db, "bookings", bookingId));
+      fetchBookings();
+    } catch (err) {
+      console.error("❌ Failed to delete booking:", err);
+      alert("Error deleting booking. It may have been removed already.");
+    }
   };
 
   useEffect(() => {

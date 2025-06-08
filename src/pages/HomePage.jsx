@@ -21,7 +21,7 @@ const HomePage = () => {
         </Link>
         <Link
           to="/login"
-          className="text-indigo-200 underline text-sm block mt-4"
+          className="text-white underline text-sm block mt-4"
         >
           🔐 Login
         </Link>

@@ -38,8 +38,9 @@ const BookingPage = () => {
   }, []);
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-4">
+    <div className="min-h-screen flex items-start justify-center p-6">
+      <div className="bg-white bg-opacity-90 backdrop-blur-md p-6 rounded-lg shadow-lg w-full max-w-3xl">
+        <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">📋 All Bookings</h1>
         <button
           onClick={() => navigate("/reader")}
@@ -84,6 +85,7 @@ const BookingPage = () => {
           ))}
         </ul>
       )}
+      </div>
     </div>
   );
 };

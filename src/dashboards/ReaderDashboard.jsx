@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { auth, db } from "../firebase";
 import {
   doc,
@@ -114,12 +114,12 @@ const ReaderDashboard = () => {
         <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">🌙 Reader Dashboard</h1>
         <div className="flex items-center gap-4">
-          <a
-            href="/book"
+          <Link
+            to="/book"
             className="text-sm text-indigo-600 hover:underline"
           >
             📋 Manage Bookings
-          </a>
+          </Link>
           <button
             onClick={handleLogout}
             className="bg-gray-200 text-gray-800 px-3 py-1 rounded hover:bg-gray-300 text-sm"

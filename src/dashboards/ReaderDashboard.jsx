@@ -4,11 +4,11 @@ import { auth, db } from "../firebase";
 import {
   doc,
   getDoc,
-  getDocs,
   collection,
   query,
   where,
   setDoc,
+  onSnapshot,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import AvailabilityEditor from "../components/AvailabilityEditor";
@@ -23,7 +23,7 @@ const ReaderDashboard = () => {
   const [formData, setFormData] = useState({ displayName: "", bio: "" });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
         console.log("👤 Not logged in, redirecting...");
         navigate("/login");
@@ -32,9 +32,17 @@ const ReaderDashboard = () => {
 
       console.log("✅ Logged in as:", currentUser.uid);
       setUser(currentUser);
+    });
 
+    return () => unsubscribe();
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const loadProfile = async () => {
       try {
-        const profileRef = doc(db, "users", currentUser.uid);
+        const profileRef = doc(db, "users", user.uid);
         const snap = await getDoc(profileRef);
 
         if (snap.exists()) {
@@ -58,47 +66,51 @@ const ReaderDashboard = () => {
       } catch (err) {
         console.error("❌ Error fetching profile:", err);
       }
+    };
 
-      try {
-        const pendingQuery = query(
-          collection(db, "bookings"),
-          where("readerId", "==", currentUser.uid),
-          where("status", "==", "pending")
-        );
-        const pendingSnap = await getDocs(pendingQuery);
-        setPendingCount(pendingSnap.size);
+    loadProfile();
 
-        const bookingsQuery = query(
-          collection(db, "bookings"),
-          where("readerId", "==", currentUser.uid),
-          where("status", "==", "accepted")
-        );
-        const snapshot = await getDocs(bookingsQuery);
-        const upcoming = await Promise.all(
-          snapshot.docs.map(async (doc) => {
-            const data = { id: doc.id, ...doc.data() };
-            const clientSnap = await getDoc(doc(db, "users", data.clientId));
-            data.clientName = clientSnap.exists()
-              ? clientSnap.data().displayName || data.clientId
-              : data.clientId;
-            return data;
-          })
-        );
-        const future = upcoming
-          .filter((b) => b.selectedTime && new Date(b.selectedTime) > new Date())
-          .sort(
-            (a, b) =>
-              new Date(a.selectedTime).getTime() -
-              new Date(b.selectedTime).getTime()
-          );
-        setBookings(future);
-      } catch (err) {
-        console.error("❌ Error fetching bookings:", err);
-      }
+    const pendingQuery = query(
+      collection(db, "bookings"),
+      where("readerId", "==", user.uid),
+      where("status", "==", "pending")
+    );
+    const bookingsQuery = query(
+      collection(db, "bookings"),
+      where("readerId", "==", user.uid),
+      where("status", "==", "accepted")
+    );
+
+    const unsubPending = onSnapshot(pendingQuery, (snap) => {
+      setPendingCount(snap.size);
     });
 
-    return () => unsubscribe();
-  }, [navigate]);
+    const unsubBookings = onSnapshot(bookingsQuery, async (snapshot) => {
+      const upcoming = await Promise.all(
+        snapshot.docs.map(async (docSnap) => {
+          const data = { id: docSnap.id, ...docSnap.data() };
+          const clientSnap = await getDoc(doc(db, "users", data.clientId));
+          data.clientName = clientSnap.exists()
+            ? clientSnap.data().displayName || data.clientId
+            : data.clientId;
+          return data;
+        })
+      );
+      const future = upcoming
+        .filter((b) => b.selectedTime && new Date(b.selectedTime) > new Date())
+        .sort(
+          (a, b) =>
+            new Date(a.selectedTime).getTime() -
+            new Date(b.selectedTime).getTime()
+        );
+      setBookings(future);
+    });
+
+    return () => {
+      unsubPending();
+      unsubBookings();
+    };
+  }, [user]);
 
   const isSessionJoinable = (selectedTime) => {
     const time = new Date(selectedTime);

@@ -148,7 +148,8 @@ const ClientDashboard = () => {
   };
 
   return (
-    <div className="p-6">
+    <div className="min-h-screen flex items-start justify-center p-6">
+      <div className="card w-full max-w-4xl">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">💫 Client Dashboard</h1>
         <button
@@ -266,6 +267,7 @@ const ClientDashboard = () => {
       {/* Dev Patch */}
       <PatchReaders />
     </div>
+  </div>
   );
 };
 

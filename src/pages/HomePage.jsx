@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 const HomePage = () => {
   return (
-    <div className="p-6 text-center">
+    <div className="min-h-screen flex flex-col items-center justify-center text-center p-6">
       <h1 className="text-3xl font-bold mb-4">🔮 Welcome to Auralynk</h1>
       <p className="mb-6 text-gray-600">Choose your role to continue:</p>
       <div className="flex justify-center gap-4">

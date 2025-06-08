@@ -2,4 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Revert to default styling */
+body {
+  @apply bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 min-h-screen font-sans text-white;
+}
+
+.card {
+  @apply bg-white bg-opacity-80 backdrop-blur-md p-6 rounded-lg shadow-lg text-gray-900;
+}

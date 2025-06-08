@@ -7,6 +7,10 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
+  arrayRemove,
+  query,
+  where,
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
@@ -37,7 +41,7 @@ const ClientDashboard = () => {
 
   const fetchReaders = async () => {
     const snapshot = await getDocs(collection(db, "users"));
-    const data = snapshot.docs
+    const rawData = snapshot.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
       .filter(
         (r) =>
@@ -45,7 +49,21 @@ const ClientDashboard = () => {
           Array.isArray(r.availableSlots) &&
           r.availableSlots.length > 0
       );
-    setReaders(data);
+
+    const readersWithFilteredSlots = await Promise.all(
+      rawData.map(async (reader) => {
+        const bookingSnap = await getDocs(
+          query(collection(db, "bookings"), where("readerId", "==", reader.id))
+        );
+        const bookedTimes = bookingSnap.docs.map((d) => d.data().selectedTime);
+        const availableSlots = reader.availableSlots.filter(
+          (slot) => !bookedTimes.includes(slot)
+        );
+        return { ...reader, availableSlots };
+      })
+    );
+
+    setReaders(readersWithFilteredSlots);
   };
 
   const handleLogout = async () => {
@@ -70,6 +88,10 @@ const ClientDashboard = () => {
       selectedTime: time.toISOString(),
       status: "pending",
     });
+    await updateDoc(doc(db, "users", readerId), {
+      availableSlots: arrayRemove(time.toISOString()),
+    });
+    fetchReaders();
     alert("✅ Session booked!");
   };
 

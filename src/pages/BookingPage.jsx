@@ -6,6 +6,7 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  arrayRemove,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
@@ -22,9 +23,14 @@ const BookingPage = () => {
     setBookings(allBookings);
   };
 
-  const updateStatus = async (bookingId, status) => {
-    const bookingRef = doc(db, "bookings", bookingId);
+  const updateStatus = async (booking, status) => {
+    const bookingRef = doc(db, "bookings", booking.id);
     await updateDoc(bookingRef, { status });
+    if (status === "accepted") {
+      await updateDoc(doc(db, "users", booking.readerId), {
+        availableSlots: arrayRemove(booking.selectedTime),
+      });
+    }
     fetchBookings();
   };
 
@@ -63,13 +69,13 @@ const BookingPage = () => {
 
               <div className="mt-2 space-x-2">
                 <button
-                  onClick={() => updateStatus(booking.id, "accepted")}
+                  onClick={() => updateStatus(booking, "accepted")}
                   className="bg-green-500 text-white px-2 py-1 rounded text-sm"
                 >
                   Accept
                 </button>
                 <button
-                  onClick={() => updateStatus(booking.id, "rejected")}
+                  onClick={() => updateStatus(booking, "rejected")}
                   className="bg-yellow-500 text-white px-2 py-1 rounded text-sm"
                 >
                   Reject

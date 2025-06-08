@@ -7,8 +7,6 @@ import {
   doc,
   getDoc,
   setDoc,
-  updateDoc,
-  arrayRemove,
   query,
   where,
 } from "firebase/firestore";
@@ -53,7 +51,11 @@ const ClientDashboard = () => {
     const readersWithFilteredSlots = await Promise.all(
       rawData.map(async (reader) => {
         const bookingSnap = await getDocs(
-          query(collection(db, "bookings"), where("readerId", "==", reader.id))
+          query(
+            collection(db, "bookings"),
+            where("readerId", "==", reader.id),
+            where("status", "==", "accepted")
+          )
         );
         const bookedTimes = bookingSnap.docs.map((d) => d.data().selectedTime);
         const availableSlots = reader.availableSlots.filter(
@@ -88,11 +90,7 @@ const ClientDashboard = () => {
       selectedTime: time.toISOString(),
       status: "pending",
     });
-    await updateDoc(doc(db, "users", readerId), {
-      availableSlots: arrayRemove(time.toISOString()),
-    });
-    fetchReaders();
-    alert("✅ Session booked!");
+    alert("✅ Booking request sent!");
   };
 
   const formatDate = (iso) => {

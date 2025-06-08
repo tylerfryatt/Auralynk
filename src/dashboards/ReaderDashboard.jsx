@@ -18,6 +18,7 @@ const ReaderDashboard = () => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [bookings, setBookings] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({ displayName: "", bio: "" });
 
@@ -59,26 +60,37 @@ const ReaderDashboard = () => {
       }
 
       try {
+        const pendingQuery = query(
+          collection(db, "bookings"),
+          where("readerId", "==", currentUser.uid),
+          where("status", "==", "pending")
+        );
+        const pendingSnap = await getDocs(pendingQuery);
+        setPendingCount(pendingSnap.size);
+
         const bookingsQuery = query(
           collection(db, "bookings"),
-          where("readerId", "==", currentUser.uid)
+          where("readerId", "==", currentUser.uid),
+          where("status", "==", "accepted")
         );
         const snapshot = await getDocs(bookingsQuery);
         const upcoming = await Promise.all(
           snapshot.docs.map(async (doc) => {
             const data = { id: doc.id, ...doc.data() };
             const clientSnap = await getDoc(doc(db, "users", data.clientId));
-            if (clientSnap.exists()) {
-              data.clientName = clientSnap.data().displayName || data.clientId;
-            } else {
-              data.clientName = data.clientId;
-            }
+            data.clientName = clientSnap.exists()
+              ? clientSnap.data().displayName || data.clientId
+              : data.clientId;
             return data;
           })
         );
-        const future = upcoming.filter(
-          (b) => b.selectedTime && new Date(b.selectedTime) > new Date()
-        );
+        const future = upcoming
+          .filter((b) => b.selectedTime && new Date(b.selectedTime) > new Date())
+          .sort(
+            (a, b) =>
+              new Date(a.selectedTime).getTime() -
+              new Date(b.selectedTime).getTime()
+          );
         setBookings(future);
       } catch (err) {
         console.error("❌ Error fetching bookings:", err);
@@ -124,11 +136,13 @@ const ReaderDashboard = () => {
         <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">🌙 Reader Dashboard</h1>
         <div className="flex items-center gap-4">
-          <Link
-            to="/book"
-            className="text-sm text-indigo-600 hover:underline"
-          >
+          <Link to="/book" className="relative text-sm text-indigo-600 hover:underline">
             📋 Manage Bookings
+            {pendingCount > 0 && (
+              <span className="absolute -top-2 -right-3 bg-red-500 text-white rounded-full px-1 text-xs">
+                {pendingCount}
+              </span>
+            )}
           </Link>
           <button
             onClick={handleLogout}

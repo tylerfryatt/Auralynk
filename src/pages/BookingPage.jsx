@@ -21,7 +21,11 @@ const BookingPage = () => {
 
   const fetchBookings = async (uid = user?.uid) => {
     if (!uid) return;
-    const q = query(collection(db, "bookings"), where("readerId", "==", uid));
+    const q = query(
+      collection(db, "bookings"),
+      where("readerId", "==", uid),
+      where("status", "==", "pending")
+    );
     const snapshot = await getDocs(q);
 
     const allBookings = await Promise.all(
@@ -38,7 +42,12 @@ const BookingPage = () => {
         return data;
       })
     );
-    setBookings(allBookings);
+    setBookings(
+      allBookings.sort(
+        (a, b) =>
+          new Date(a.selectedTime).getTime() - new Date(b.selectedTime).getTime()
+      )
+    );
   };
 
   const updateStatus = async (booking, status) => {

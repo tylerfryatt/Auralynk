@@ -7,6 +7,7 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  addDoc,
   arrayRemove,
   query,
   where,
@@ -71,6 +72,13 @@ const BookingPage = () => {
               body: JSON.stringify({ email, time: booking.selectedTime }),
             });
           }
+
+          // create notification record
+          await addDoc(collection(db, "users", booking.clientId, "notifications"), {
+            message: `Your session with ${booking.readerName || booking.readerId} on ${new Date(booking.selectedTime).toLocaleString()} has been confirmed.`,
+            timestamp: new Date().toISOString(),
+            read: false,
+          });
         } catch (err) {
           console.error("Failed to send confirmation email:", err);
         }

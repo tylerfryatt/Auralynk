@@ -21,6 +21,7 @@ const ClientDashboard = () => {
   const [editing, setEditing] = useState(false);
   const [readers, setReaders] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -33,6 +34,7 @@ const ClientDashboard = () => {
       const snap = await getDoc(profileRef);
       if (snap.exists()) setProfile(snap.data());
       fetchBookings(currentUser.uid);
+      fetchNotifications(currentUser.uid);
     });
 
     fetchReaders();
@@ -95,6 +97,14 @@ const ClientDashboard = () => {
     setBookings(future);
   };
 
+  const fetchNotifications = async (uid) => {
+    const snap = await getDocs(collection(db, "users", uid, "notifications"));
+    const notes = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    setNotifications(notes);
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
     navigate("/");
@@ -107,10 +117,14 @@ const ClientDashboard = () => {
     setEditing(false);
   };
 
-  const handleBook = async (readerId, slot) => {
+  const handleBook = async (readerId, slot, readerName) => {
     if (!user || !readerId || !slot) return;
     const time = new Date(slot);
     if (time <= new Date()) return alert("❌ Can't book a past time.");
+
+    const confirmMsg = `Book ${readerName || 'this reader'} on ${time.toLocaleString()}?`;
+    if (!window.confirm(confirmMsg)) return;
+
     await addDoc(collection(db, "bookings"), {
       clientId: user.uid,
       readerId,
@@ -224,6 +238,20 @@ const ClientDashboard = () => {
         </ul>
       )}
 
+      {/* Notifications */}
+      <h2 className="text-lg font-semibold mb-4">🔔 Notifications</h2>
+      {notifications.length === 0 ? (
+        <p className="text-gray-600 mb-6">No notifications.</p>
+      ) : (
+        <ul className="space-y-2 mb-6">
+          {notifications.map((n) => (
+            <li key={n.id} className="text-sm border-b pb-1">
+              {n.message}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {/* Reader Feed */}
       <h2 className="text-lg font-semibold mb-4">🔮 Available Readers</h2>
       {readers.length === 0 ? (
@@ -248,7 +276,7 @@ const ClientDashboard = () => {
                         {slots.map((slot) => (
                           <button
                             key={slot}
-                            onClick={() => handleBook(reader.id, slot)}
+                            onClick={() => handleBook(reader.id, slot, reader.displayName)}
                             className="bg-indigo-600 text-white text-xs px-3 py-1 rounded hover:bg-indigo-700 whitespace-nowrap flex-shrink-0"
                           >
                             {formatTime(slot)}

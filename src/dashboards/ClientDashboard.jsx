@@ -20,6 +20,7 @@ const ClientDashboard = () => {
   const [profile, setProfile] = useState({ displayName: "", bio: "" });
   const [editing, setEditing] = useState(false);
   const [readers, setReaders] = useState([]);
+  const [bookings, setBookings] = useState([]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -31,6 +32,7 @@ const ClientDashboard = () => {
       const profileRef = doc(db, "users", currentUser.uid);
       const snap = await getDoc(profileRef);
       if (snap.exists()) setProfile(snap.data());
+      fetchBookings(currentUser.uid);
     });
 
     fetchReaders();
@@ -66,6 +68,19 @@ const ClientDashboard = () => {
     );
 
     setReaders(readersWithFilteredSlots);
+  };
+
+  const fetchBookings = async (uid) => {
+    const q = query(
+      collection(db, "bookings"),
+      where("clientId", "==", uid),
+      where("status", "==", "accepted")
+    );
+    const snapshot = await getDocs(q);
+    const upcoming = snapshot.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((b) => new Date(b.selectedTime) > new Date());
+    setBookings(upcoming);
   };
 
   const handleLogout = async () => {
@@ -182,6 +197,20 @@ const ClientDashboard = () => {
           </div>
         )}
       </div>
+
+      {/* Upcoming Booking */}
+      <h2 className="text-lg font-semibold mb-4">📅 Upcoming Session</h2>
+      {bookings.length === 0 ? (
+        <p className="text-gray-600">No upcoming bookings.</p>
+      ) : (
+        <ul className="space-y-2 mb-6">
+          {bookings.map((b) => (
+            <li key={b.id} className="text-sm">
+              {new Date(b.selectedTime).toLocaleString()} with {b.readerId}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* Reader Feed */}
       <h2 className="text-lg font-semibold mb-4">🔮 Available Readers</h2>

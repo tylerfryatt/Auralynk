@@ -4,6 +4,7 @@
 import express from "express";
 import axios from "axios";
 import cors from "cors";
+import nodemailer from "nodemailer";
 
 const app = express();
 app.use(cors());
@@ -36,6 +37,34 @@ app.post("/create-room", async (req, res) => {
   } catch (err) {
     console.error("Failed to create Daily room:", err.message);
     res.status(500).json({ error: "Room creation failed" });
+  }
+});
+
+app.post("/send-confirmation", async (req, res) => {
+  const { email, time } = req.body;
+  try {
+    const testAccount = await nodemailer.createTestAccount();
+    const transporter = nodemailer.createTransport({
+      host: testAccount.smtp.host,
+      port: testAccount.smtp.port,
+      secure: testAccount.smtp.secure,
+      auth: {
+        user: testAccount.user,
+        pass: testAccount.pass,
+      },
+    });
+
+    await transporter.sendMail({
+      from: 'Auralynk <no-reply@auralynk.com>',
+      to: email,
+      subject: 'Booking Confirmed',
+      text: `Your session is booked for ${new Date(time).toLocaleString()}.`,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to send confirmation email:', err.message);
+    res.status(500).json({ error: 'Email failed' });
   }
 });
 

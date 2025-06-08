@@ -3,6 +3,7 @@ import { auth, db } from "../firebase";
 import {
   collection,
   getDocs,
+  getDoc,
   doc,
   updateDoc,
   deleteDoc,
@@ -33,11 +34,28 @@ const BookingPage = () => {
     try {
       const bookingRef = doc(db, "bookings", booking.id);
       await updateDoc(bookingRef, { status });
+
       if (status === "accepted") {
         await updateDoc(doc(db, "users", booking.readerId), {
           availableSlots: arrayRemove(booking.selectedTime),
         });
+
+        // notify the client via email
+        try {
+          const clientSnap = await getDoc(doc(db, "users", booking.clientId));
+          const email = clientSnap.exists() ? clientSnap.data().email : null;
+          if (email) {
+            await fetch("http://localhost:4000/send-confirmation", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email, time: booking.selectedTime }),
+            });
+          }
+        } catch (err) {
+          console.error("Failed to send confirmation email:", err);
+        }
       }
+
       fetchBookings(user?.uid);
     } catch (err) {
       console.error("❌ Failed to update booking:", err);

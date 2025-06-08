@@ -2,10 +2,4 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply min-h-screen font-sans bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-gray-900;
-}
-
-#root {
-  @apply min-h-screen flex flex-col;
-}
+/* Revert to default styling */

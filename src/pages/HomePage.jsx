@@ -3,9 +3,9 @@ import { Link } from "react-router-dom";
 
 const HomePage = () => {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-center text-white px-6">
-      <h1 className="text-4xl font-bold mb-4">🔮 Welcome to Auralynk</h1>
-      <p className="mb-6 text-white/80">Choose your role to continue:</p>
+    <div className="p-6 text-center">
+      <h1 className="text-3xl font-bold mb-4">🔮 Welcome to Auralynk</h1>
+      <p className="mb-6 text-gray-600">Choose your role to continue:</p>
       <div className="flex justify-center gap-4">
         <Link
           to="/client"
@@ -21,7 +21,7 @@ const HomePage = () => {
         </Link>
         <Link
           to="/login"
-          className="text-white underline text-sm block mt-4"
+          className="text-blue-600 underline text-sm block mt-4"
         >
           🔐 Login
         </Link>

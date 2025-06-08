@@ -63,12 +63,11 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="bg-white bg-opacity-90 backdrop-blur-md p-8 rounded-lg shadow-lg w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-4 text-center">
-          {isNewUser ? "Sign Up" : "Log In"}
-        </h1>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <div className="p-4 max-w-md mx-auto">
+      <h1 className="text-2xl font-bold mb-4">
+        {isNewUser ? "Sign Up" : "Log In"}
+      </h1>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
             type="email"
             placeholder="Email"
@@ -109,7 +108,6 @@ export default function AuthPage() {
           {isNewUser ? "Already have an account?" : "Need to create an account?"}
         </button>
       </form>
-      </div>
     </div>
   );
 }

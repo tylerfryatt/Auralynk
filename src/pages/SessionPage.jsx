@@ -22,25 +22,13 @@ const SessionPage = () => {
     fetchBooking();
   }, [bookingId]);
 
-  if (loading)
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6 text-white">
-        Loading session...
-      </div>
-    );
-  if (!roomUrl)
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6 text-white">
-        ❌ No room URL found for this session.
-      </div>
-    );
+  if (loading) return <div className="p-6">Loading session...</div>;
+  if (!roomUrl) return <div className="p-6">❌ No room URL found for this session.</div>;
 
   return (
-    <div className="min-h-screen flex items-start justify-center p-6">
-      <div className="bg-white bg-opacity-90 backdrop-blur-md p-6 rounded-lg shadow-lg w-full max-w-3xl">
-        <h1 className="text-2xl font-bold mb-4">🔗 Live Session</h1>
-        <VideoCall roomUrl={roomUrl} />
-      </div>
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">🔗 Live Session</h1>
+      <VideoCall roomUrl={roomUrl} />
     </div>
   );
 };

@@ -131,9 +131,8 @@ const ReaderDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-start justify-center p-6">
-      <div className="bg-white bg-opacity-90 backdrop-blur-md p-6 rounded-lg shadow-lg w-full max-w-4xl">
-        <div className="flex justify-between items-center mb-6">
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">🌙 Reader Dashboard</h1>
         <div className="flex items-center gap-4">
           <Link to="/book" className="relative text-sm text-indigo-600 hover:underline">
@@ -254,7 +253,6 @@ const ReaderDashboard = () => {
           })}
         </ul>
       )}
-      </div>
     </div>
   );
 };

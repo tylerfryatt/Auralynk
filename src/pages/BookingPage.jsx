@@ -23,10 +23,21 @@ const BookingPage = () => {
     if (!uid) return;
     const q = query(collection(db, "bookings"), where("readerId", "==", uid));
     const snapshot = await getDocs(q);
-    const allBookings = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+
+    const allBookings = await Promise.all(
+      snapshot.docs.map(async (docSnap) => {
+        const data = { id: docSnap.id, ...docSnap.data() };
+        const clientSnap = await getDoc(doc(db, "users", data.clientId));
+        data.clientName = clientSnap.exists()
+          ? clientSnap.data().displayName || data.clientId
+          : data.clientId;
+        const readerSnap = await getDoc(doc(db, "users", data.readerId));
+        data.readerName = readerSnap.exists()
+          ? readerSnap.data().displayName || data.readerId
+          : data.readerId;
+        return data;
+      })
+    );
     setBookings(allBookings);
   };
 
@@ -105,8 +116,8 @@ const BookingPage = () => {
           {bookings.map((booking) => (
             <li key={booking.id} className="border p-3 rounded shadow">
               <div>📅 {new Date(booking.selectedTime).toLocaleString()}</div>
-              <div>Client: {booking.clientId}</div>
-              <div>Reader: {booking.readerId}</div>
+              <div>Client: {booking.clientName || booking.clientId}</div>
+              <div>Reader: {booking.readerName || booking.readerId}</div>
               <div>Status: {booking.status}</div>
 
               <div className="mt-2 space-x-2">

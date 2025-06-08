@@ -77,10 +77,22 @@ const ClientDashboard = () => {
       where("status", "==", "accepted")
     );
     const snapshot = await getDocs(q);
-    const upcoming = snapshot.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .filter((b) => new Date(b.selectedTime) > new Date());
-    setBookings(upcoming);
+
+    const upcoming = await Promise.all(
+      snapshot.docs.map(async (d) => {
+        const data = { id: d.id, ...d.data() };
+        const readerSnap = await getDoc(doc(db, "users", data.readerId));
+        data.readerName = readerSnap.exists()
+          ? readerSnap.data().displayName || data.readerId
+          : data.readerId;
+        return data;
+      })
+    );
+
+    const future = upcoming.filter(
+      (b) => b.selectedTime && new Date(b.selectedTime) > new Date()
+    );
+    setBookings(future);
   };
 
   const handleLogout = async () => {
@@ -206,7 +218,7 @@ const ClientDashboard = () => {
         <ul className="space-y-2 mb-6">
           {bookings.map((b) => (
             <li key={b.id} className="text-sm">
-              {new Date(b.selectedTime).toLocaleString()} with {b.readerId}
+              {new Date(b.selectedTime).toLocaleString()} with {b.readerName || b.readerId}
             </li>
           ))}
         </ul>

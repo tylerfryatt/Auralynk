@@ -9,6 +9,9 @@ import {
   where,
   setDoc,
   onSnapshot,
+  updateDoc,
+  deleteDoc,
+  arrayUnion,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import AvailabilityEditor from "../components/AvailabilityEditor";
@@ -142,6 +145,20 @@ const ReaderDashboard = () => {
     setEditing(false);
   };
 
+  const cancelBooking = async (booking) => {
+    if (!window.confirm("Cancel this booking?")) return;
+    try {
+      await deleteDoc(doc(db, "bookings", booking.id));
+      await updateDoc(doc(db, "users", booking.readerId), {
+        availableSlots: arrayUnion(booking.selectedTime),
+      });
+      setBookings((prev) => prev.filter((b) => b.id !== booking.id));
+    } catch (err) {
+      console.error("Failed to cancel booking", err);
+      alert("Error canceling booking.");
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-start justify-center p-6">
       <div className="card w-full max-w-4xl">
@@ -244,23 +261,29 @@ const ReaderDashboard = () => {
             const joinable = b.roomUrl && isSessionJoinable(b.selectedTime);
 
             return (
-              <li key={i} className="border-b pb-2 text-sm">
+              <li key={i} className="border-b pb-2 text-sm flex justify-between items-center">
                 <div>
                   📅 {validDate.toLocaleString()} — Client: {b.clientName || b.clientId}
+                  {" "}
+                  {joinable ? (
+                    <a
+                      href={`/session/${b.id}`}
+                      className="text-blue-500 hover:underline ml-1"
+                    >
+                      🔗 Join Video Session
+                    </a>
+                  ) : (
+                    <span className="text-xs text-gray-500 italic ml-1">
+                      {b.roomUrl ? "Not time to join yet" : "No room link yet"}
+                    </span>
+                  )}
                 </div>
-
-                {joinable ? (
-                  <a
-                    href={`/session/${b.id}`}
-                    className="text-blue-500 hover:underline"
-                  >
-                    🔗 Join Video Session
-                  </a>
-                ) : (
-                  <div className="text-xs text-gray-500 italic">
-                    {b.roomUrl ? "Not time to join yet" : "No room link yet"}
-                  </div>
-                )}
+                <button
+                  onClick={() => cancelBooking(b)}
+                  className="text-red-600 text-xs hover:underline ml-2"
+                >
+                  Cancel
+                </button>
               </li>
             );
           })}

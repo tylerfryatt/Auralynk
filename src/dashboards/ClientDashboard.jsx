@@ -9,6 +9,9 @@ import {
   setDoc,
   query,
   where,
+  deleteDoc,
+  updateDoc,
+  arrayUnion,
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
@@ -122,7 +125,7 @@ const ClientDashboard = () => {
     const time = new Date(slot);
     if (time <= new Date()) return alert("❌ Can't book a past time.");
 
-    const confirmMsg = `Book ${readerName || 'this reader'} on ${time.toLocaleString()}?`;
+    const confirmMsg = `Are you sure you want to book ${readerName || 'this reader'} on ${time.toLocaleString()}?`;
     if (!window.confirm(confirmMsg)) return;
 
     await addDoc(collection(db, "bookings"), {
@@ -132,6 +135,20 @@ const ClientDashboard = () => {
       status: "pending",
     });
     alert("✅ Booking request sent!");
+  };
+
+  const cancelBooking = async (booking) => {
+    if (!window.confirm("Cancel this booking?")) return;
+    try {
+      await deleteDoc(doc(db, "bookings", booking.id));
+      await updateDoc(doc(db, "users", booking.readerId), {
+        availableSlots: arrayUnion(booking.selectedTime),
+      });
+      setBookings((prev) => prev.filter((b) => b.id !== booking.id));
+    } catch (err) {
+      console.error("Failed to cancel booking", err);
+      alert("Error canceling booking.");
+    }
   };
 
   const formatDate = (iso) => {
@@ -231,8 +248,16 @@ const ClientDashboard = () => {
       ) : (
         <ul className="space-y-2 mb-6">
           {bookings.map((b) => (
-            <li key={b.id} className="text-sm">
-              {new Date(b.selectedTime).toLocaleString()} with {b.readerName || b.readerId}
+            <li key={b.id} className="text-sm flex justify-between items-center border-b pb-1">
+              <span>
+                {new Date(b.selectedTime).toLocaleString()} with {b.readerName || b.readerId}
+              </span>
+              <button
+                onClick={() => cancelBooking(b)}
+                className="text-red-600 text-xs hover:underline ml-2"
+              >
+                Cancel
+              </button>
             </li>
           ))}
         </ul>

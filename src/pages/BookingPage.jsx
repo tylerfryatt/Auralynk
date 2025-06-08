@@ -54,7 +54,21 @@ const BookingPage = () => {
   const updateStatus = async (booking, status) => {
     try {
       const bookingRef = doc(db, "bookings", booking.id);
-      await updateDoc(bookingRef, { status });
+
+      let roomUrl;
+      if (status === "accepted") {
+        try {
+          const resp = await fetch("http://localhost:4000/create-room", {
+            method: "POST",
+          });
+          const data = await resp.json();
+          roomUrl = data.roomUrl;
+        } catch (err) {
+          console.error("Failed to create Daily room:", err);
+        }
+      }
+
+      await updateDoc(bookingRef, { status, ...(roomUrl && { roomUrl }) });
 
       if (status === "accepted") {
         await updateDoc(doc(db, "users", booking.readerId), {

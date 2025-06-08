@@ -5,12 +5,15 @@ import express from "express";
 import axios from "axios";
 import cors from "cors";
 import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const DAILY_API_KEY = "a3b9de5a340f6c5b03c01728fded2d3caae01358c5ae384fa367cfae9aaee525"; // Replace this!
+const DAILY_API_KEY = process.env.VITE_DAILY_API_KEY;
 
 app.post("/create-room", async (req, res) => {
   try {

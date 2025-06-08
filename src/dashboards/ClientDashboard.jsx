@@ -128,11 +128,23 @@ const ClientDashboard = () => {
     const confirmMsg = `Are you sure you want to book ${readerName || 'this reader'} on ${time.toLocaleString()}?`;
     if (!window.confirm(confirmMsg)) return;
 
+    let roomUrl;
+    try {
+      const resp = await fetch("http://localhost:4000/create-room", {
+        method: "POST",
+      });
+      const data = await resp.json();
+      roomUrl = data.roomUrl;
+    } catch (err) {
+      console.error("Failed to create Daily room:", err);
+    }
+
     await addDoc(collection(db, "bookings"), {
       clientId: user.uid,
       readerId,
       selectedTime: time.toISOString(),
       status: "pending",
+      roomUrl,
     });
     alert("✅ Booking request sent!");
   };
@@ -149,6 +161,13 @@ const ClientDashboard = () => {
       console.error("Failed to cancel booking", err);
       alert("Error canceling booking.");
     }
+  };
+
+  const isSessionJoinable = (selectedTime) => {
+    const time = new Date(selectedTime);
+    const now = new Date();
+    const diff = (time - now) / 1000 / 60;
+    return diff <= 15 && diff >= -60;
   };
 
   const formatDate = (iso) => {
@@ -247,19 +266,32 @@ const ClientDashboard = () => {
         <p className="text-gray-600">No upcoming bookings.</p>
       ) : (
         <ul className="space-y-2 mb-6">
-          {bookings.map((b) => (
-            <li key={b.id} className="text-sm flex justify-between items-center border-b pb-1">
-              <span>
-                {new Date(b.selectedTime).toLocaleString()} with {b.readerName || b.readerId}
-              </span>
-              <button
-                onClick={() => cancelBooking(b)}
-                className="text-red-600 text-xs hover:underline ml-2"
-              >
-                Cancel
-              </button>
-            </li>
-          ))}
+          {bookings.map((b) => {
+            const joinable = b.roomUrl && isSessionJoinable(b.selectedTime);
+            return (
+              <li key={b.id} className="text-sm flex justify-between items-center border-b pb-1">
+                <div>
+                  {new Date(b.selectedTime).toLocaleString()} with {b.readerName || b.readerId}
+                  {" "}
+                  {joinable ? (
+                    <a href={`/session/${b.id}`} className="text-blue-500 hover:underline ml-1">
+                      🔗 Join Video Session
+                    </a>
+                  ) : (
+                    <span className="text-xs text-gray-500 italic ml-1">
+                      {b.roomUrl ? "Not time to join yet" : "No room link yet"}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => cancelBooking(b)}
+                  className="text-red-600 text-xs hover:underline ml-2"
+                >
+                  Cancel
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 

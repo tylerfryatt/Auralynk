@@ -63,19 +63,20 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="p-4 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold mb-4">
-        {isNewUser ? "Sign Up" : "Log In"}
-      </h1>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="p-2 border rounded"
-          required
-        />
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="bg-white bg-opacity-90 backdrop-blur-md p-8 rounded-lg shadow-lg w-full max-w-md">
+        <h1 className="text-2xl font-bold mb-4 text-center">
+          {isNewUser ? "Sign Up" : "Log In"}
+        </h1>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="p-2 border rounded"
+            required
+          />
         <input
           type="password"
           placeholder="Password"
@@ -96,18 +97,19 @@ export default function AuthPage() {
         )}
         <button
           type="submit"
-          className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+          className="bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700"
         >
           {isNewUser ? "Create Account" : "Log In"}
         </button>
         <button
           type="button"
           onClick={() => setIsNewUser(!isNewUser)}
-          className="text-sm underline"
+          className="text-sm underline text-indigo-700"
         >
           {isNewUser ? "Already have an account?" : "Need to create an account?"}
         </button>
       </form>
+      </div>
     </div>
   );
 }

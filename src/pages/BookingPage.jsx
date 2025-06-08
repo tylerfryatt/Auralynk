@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { db } from "../firebase";
+import { auth, db } from "../firebase";
 import {
   collection,
   getDocs,
@@ -7,15 +7,21 @@ import {
   updateDoc,
   deleteDoc,
   arrayRemove,
+  query,
+  where,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+import { onAuthStateChanged } from "firebase/auth";
 
 const BookingPage = () => {
+  const [user, setUser] = useState(null);
   const [bookings, setBookings] = useState([]);
   const navigate = useNavigate();
 
-  const fetchBookings = async () => {
-    const snapshot = await getDocs(collection(db, "bookings"));
+  const fetchBookings = async (uid = user?.uid) => {
+    if (!uid) return;
+    const q = query(collection(db, "bookings"), where("readerId", "==", uid));
+    const snapshot = await getDocs(q);
     const allBookings = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -32,7 +38,7 @@ const BookingPage = () => {
           availableSlots: arrayRemove(booking.selectedTime),
         });
       }
-      fetchBookings();
+      fetchBookings(user?.uid);
     } catch (err) {
       console.error("❌ Failed to update booking:", err);
       alert("Error updating booking. It may have been removed.");
@@ -42,7 +48,7 @@ const BookingPage = () => {
   const deleteBooking = async (bookingId) => {
     try {
       await deleteDoc(doc(db, "bookings", bookingId));
-      fetchBookings();
+      fetchBookings(user?.uid);
     } catch (err) {
       console.error("❌ Failed to delete booking:", err);
       alert("Error deleting booking. It may have been removed already.");
@@ -50,8 +56,16 @@ const BookingPage = () => {
   };
 
   useEffect(() => {
-    fetchBookings();
-  }, []);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (!currentUser) {
+        navigate("/login");
+        return;
+      }
+      setUser(currentUser);
+      fetchBookings(currentUser.uid);
+    });
+    return () => unsubscribe();
+  }, [navigate]);
 
   return (
     <div className="min-h-screen flex items-start justify-center p-6">

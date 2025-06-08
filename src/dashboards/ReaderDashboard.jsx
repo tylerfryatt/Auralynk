@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { auth, db } from "../firebase";
 import {
   doc,
   getDoc,
-  getDocs,
   collection,
   query,
   where,
   setDoc,
+  onSnapshot,
+  updateDoc,
+  deleteDoc,
+  arrayUnion,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import AvailabilityEditor from "../components/AvailabilityEditor";
@@ -18,11 +21,12 @@ const ReaderDashboard = () => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [bookings, setBookings] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({ displayName: "", bio: "" });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
         console.log("👤 Not logged in, redirecting...");
         navigate("/login");
@@ -31,9 +35,17 @@ const ReaderDashboard = () => {
 
       console.log("✅ Logged in as:", currentUser.uid);
       setUser(currentUser);
+    });
 
+    return () => unsubscribe();
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const loadProfile = async () => {
       try {
-        const profileRef = doc(db, "users", currentUser.uid);
+        const profileRef = doc(db, "users", user.uid);
         const snap = await getDoc(profileRef);
 
         if (snap.exists()) {
@@ -57,26 +69,51 @@ const ReaderDashboard = () => {
       } catch (err) {
         console.error("❌ Error fetching profile:", err);
       }
+    };
 
-      try {
-        const bookingsQuery = query(
-          collection(db, "bookings"),
-          where("readerId", "==", currentUser.uid)
-        );
-        const snapshot = await getDocs(bookingsQuery);
-        const upcoming = snapshot.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter(
-            (b) => b.selectedTime && new Date(b.selectedTime) > new Date()
-          );
-        setBookings(upcoming);
-      } catch (err) {
-        console.error("❌ Error fetching bookings:", err);
-      }
+    loadProfile();
+
+    const pendingQuery = query(
+      collection(db, "bookings"),
+      where("readerId", "==", user.uid),
+      where("status", "==", "pending")
+    );
+    const bookingsQuery = query(
+      collection(db, "bookings"),
+      where("readerId", "==", user.uid),
+      where("status", "==", "accepted")
+    );
+
+    const unsubPending = onSnapshot(pendingQuery, (snap) => {
+      setPendingCount(snap.size);
     });
 
-    return () => unsubscribe();
-  }, [navigate]);
+    const unsubBookings = onSnapshot(bookingsQuery, async (snapshot) => {
+      const upcoming = await Promise.all(
+        snapshot.docs.map(async (docSnap) => {
+          const data = { id: docSnap.id, ...docSnap.data() };
+          const clientSnap = await getDoc(doc(db, "users", data.clientId));
+          data.clientName = clientSnap.exists()
+            ? clientSnap.data().displayName || data.clientId
+            : data.clientId;
+          return data;
+        })
+      );
+      const future = upcoming
+        .filter((b) => b.selectedTime && new Date(b.selectedTime) > new Date())
+        .sort(
+          (a, b) =>
+            new Date(a.selectedTime).getTime() -
+            new Date(b.selectedTime).getTime()
+        );
+      setBookings(future);
+    });
+
+    return () => {
+      unsubPending();
+      unsubBookings();
+    };
+  }, [user]);
 
   const isSessionJoinable = (selectedTime) => {
     const time = new Date(selectedTime);
@@ -108,17 +145,34 @@ const ReaderDashboard = () => {
     setEditing(false);
   };
 
+  const cancelBooking = async (booking) => {
+    if (!window.confirm("Cancel this booking?")) return;
+    try {
+      await deleteDoc(doc(db, "bookings", booking.id));
+      await updateDoc(doc(db, "users", booking.readerId), {
+        availableSlots: arrayUnion(booking.selectedTime),
+      });
+      setBookings((prev) => prev.filter((b) => b.id !== booking.id));
+    } catch (err) {
+      console.error("Failed to cancel booking", err);
+      alert("Error canceling booking.");
+    }
+  };
+
   return (
-    <div className="p-6">
+    <div className="min-h-screen flex items-start justify-center p-6">
+      <div className="card w-full max-w-4xl">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">🌙 Reader Dashboard</h1>
         <div className="flex items-center gap-4">
-          <a
-            href="/book"
-            className="text-sm text-indigo-600 hover:underline"
-          >
+          <Link to="/book" className="relative text-sm text-indigo-600 hover:underline">
             📋 Manage Bookings
-          </a>
+            {pendingCount > 0 && (
+              <span className="absolute -top-2 -right-3 bg-red-500 text-white rounded-full px-1 text-xs">
+                {pendingCount}
+              </span>
+            )}
+          </Link>
           <button
             onClick={handleLogout}
             className="bg-gray-200 text-gray-800 px-3 py-1 rounded hover:bg-gray-300 text-sm"
@@ -207,28 +261,35 @@ const ReaderDashboard = () => {
             const joinable = b.roomUrl && isSessionJoinable(b.selectedTime);
 
             return (
-              <li key={i} className="border-b pb-2 text-sm">
+              <li key={i} className="border-b pb-2 text-sm flex justify-between items-center">
                 <div>
-                  📅 {validDate.toLocaleString()} — Client ID: {b.clientId}
+                  📅 {validDate.toLocaleString()} — Client: {b.clientName || b.clientId}
+                  {" "}
+                  {joinable ? (
+                    <a
+                      href={`/session/${b.id}`}
+                      className="text-blue-500 hover:underline ml-1"
+                    >
+                      🔗 Join Video Session
+                    </a>
+                  ) : (
+                    <span className="text-xs text-gray-500 italic ml-1">
+                      {b.roomUrl ? "Not time to join yet" : "No room link yet"}
+                    </span>
+                  )}
                 </div>
-
-                {joinable ? (
-                  <a
-                    href={`/session/${b.id}`}
-                    className="text-blue-500 hover:underline"
-                  >
-                    🔗 Join Video Session
-                  </a>
-                ) : (
-                  <div className="text-xs text-gray-500 italic">
-                    {b.roomUrl ? "Not time to join yet" : "No room link yet"}
-                  </div>
-                )}
+                <button
+                  onClick={() => cancelBooking(b)}
+                  className="text-red-600 text-xs hover:underline ml-2"
+                >
+                  Cancel
+                </button>
               </li>
             );
           })}
         </ul>
       )}
+      </div>
     </div>
   );
 };

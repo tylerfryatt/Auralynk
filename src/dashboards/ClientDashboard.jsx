@@ -7,6 +7,11 @@ import {
   doc,
   getDoc,
   setDoc,
+  query,
+  where,
+  deleteDoc,
+  updateDoc,
+  arrayUnion,
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
@@ -18,6 +23,8 @@ const ClientDashboard = () => {
   const [profile, setProfile] = useState({ displayName: "", bio: "" });
   const [editing, setEditing] = useState(false);
   const [readers, setReaders] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -29,6 +36,8 @@ const ClientDashboard = () => {
       const profileRef = doc(db, "users", currentUser.uid);
       const snap = await getDoc(profileRef);
       if (snap.exists()) setProfile(snap.data());
+      fetchBookings(currentUser.uid);
+      fetchNotifications(currentUser.uid);
     });
 
     fetchReaders();
@@ -37,7 +46,7 @@ const ClientDashboard = () => {
 
   const fetchReaders = async () => {
     const snapshot = await getDocs(collection(db, "users"));
-    const data = snapshot.docs
+    const rawData = snapshot.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
       .filter(
         (r) =>
@@ -45,7 +54,58 @@ const ClientDashboard = () => {
           Array.isArray(r.availableSlots) &&
           r.availableSlots.length > 0
       );
-    setReaders(data);
+
+    const readersWithFilteredSlots = await Promise.all(
+      rawData.map(async (reader) => {
+        const bookingSnap = await getDocs(
+          query(collection(db, "bookings"), where("readerId", "==", reader.id))
+        );
+        const bookedTimes = bookingSnap.docs
+          .filter((d) => d.data().status !== "rejected")
+          .map((d) => d.data().selectedTime);
+
+        const availableSlots = reader.availableSlots.filter(
+          (slot) => !bookedTimes.includes(slot)
+        );
+
+        return { ...reader, availableSlots };
+      })
+    );
+
+    setReaders(readersWithFilteredSlots);
+  };
+
+  const fetchBookings = async (uid) => {
+    const q = query(
+      collection(db, "bookings"),
+      where("clientId", "==", uid),
+      where("status", "==", "accepted")
+    );
+    const snapshot = await getDocs(q);
+
+    const upcoming = await Promise.all(
+      snapshot.docs.map(async (d) => {
+        const data = { id: d.id, ...d.data() };
+        const readerSnap = await getDoc(doc(db, "users", data.readerId));
+        data.readerName = readerSnap.exists()
+          ? readerSnap.data().displayName || data.readerId
+          : data.readerId;
+        return data;
+      })
+    );
+
+    const future = upcoming.filter(
+      (b) => b.selectedTime && new Date(b.selectedTime) > new Date()
+    );
+    setBookings(future);
+  };
+
+  const fetchNotifications = async (uid) => {
+    const snap = await getDocs(collection(db, "users", uid, "notifications"));
+    const notes = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    setNotifications(notes);
   };
 
   const handleLogout = async () => {
@@ -60,17 +120,54 @@ const ClientDashboard = () => {
     setEditing(false);
   };
 
-  const handleBook = async (readerId, slot) => {
+  const handleBook = async (readerId, slot, readerName) => {
     if (!user || !readerId || !slot) return;
     const time = new Date(slot);
     if (time <= new Date()) return alert("❌ Can't book a past time.");
+
+    const confirmMsg = `Are you sure you want to book ${readerName || 'this reader'} on ${time.toLocaleString()}?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    let roomUrl;
+    try {
+      const resp = await fetch("http://localhost:4000/create-room", {
+        method: "POST",
+      });
+      const data = await resp.json();
+      roomUrl = data.roomUrl;
+    } catch (err) {
+      console.error("Failed to create Daily room:", err);
+    }
+
     await addDoc(collection(db, "bookings"), {
       clientId: user.uid,
       readerId,
       selectedTime: time.toISOString(),
       status: "pending",
+      roomUrl,
     });
-    alert("✅ Session booked!");
+    alert("✅ Booking request sent!");
+  };
+
+  const cancelBooking = async (booking) => {
+    if (!window.confirm("Cancel this booking?")) return;
+    try {
+      await deleteDoc(doc(db, "bookings", booking.id));
+      await updateDoc(doc(db, "users", booking.readerId), {
+        availableSlots: arrayUnion(booking.selectedTime),
+      });
+      setBookings((prev) => prev.filter((b) => b.id !== booking.id));
+    } catch (err) {
+      console.error("Failed to cancel booking", err);
+      alert("Error canceling booking.");
+    }
+  };
+
+  const isSessionJoinable = (selectedTime) => {
+    const time = new Date(selectedTime);
+    const now = new Date();
+    const diff = (time - now) / 1000 / 60;
+    return diff <= 15 && diff >= -60;
   };
 
   const formatDate = (iso) => {
@@ -101,7 +198,8 @@ const ClientDashboard = () => {
   };
 
   return (
-    <div className="p-6">
+    <div className="min-h-screen flex items-start justify-center p-6">
+      <div className="card w-full max-w-4xl">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">💫 Client Dashboard</h1>
         <button
@@ -162,6 +260,55 @@ const ClientDashboard = () => {
         )}
       </div>
 
+      {/* Upcoming Booking */}
+      <h2 className="text-lg font-semibold mb-4">📅 Upcoming Session</h2>
+      {bookings.length === 0 ? (
+        <p className="text-gray-600">No upcoming bookings.</p>
+      ) : (
+        <ul className="space-y-2 mb-6">
+          {bookings.map((b) => {
+            const joinable = b.roomUrl && isSessionJoinable(b.selectedTime);
+            return (
+              <li key={b.id} className="text-sm flex justify-between items-center border-b pb-1">
+                <div>
+                  {new Date(b.selectedTime).toLocaleString()} with {b.readerName || b.readerId}
+                  {" "}
+                  {joinable ? (
+                    <a href={`/session/${b.id}`} className="text-blue-500 hover:underline ml-1">
+                      🔗 Join Video Session
+                    </a>
+                  ) : (
+                    <span className="text-xs text-gray-500 italic ml-1">
+                      {b.roomUrl ? "Not time to join yet" : "No room link yet"}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => cancelBooking(b)}
+                  className="text-red-600 text-xs hover:underline ml-2"
+                >
+                  Cancel
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* Notifications */}
+      <h2 className="text-lg font-semibold mb-4">🔔 Notifications</h2>
+      {notifications.length === 0 ? (
+        <p className="text-gray-600 mb-6">No notifications.</p>
+      ) : (
+        <ul className="space-y-2 mb-6">
+          {notifications.map((n) => (
+            <li key={n.id} className="text-sm border-b pb-1">
+              {n.message}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {/* Reader Feed */}
       <h2 className="text-lg font-semibold mb-4">🔮 Available Readers</h2>
       {readers.length === 0 ? (
@@ -171,7 +318,7 @@ const ClientDashboard = () => {
           {readers.map((reader) => {
             const grouped = groupSlotsByDay(reader.availableSlots);
             return (
-              <li key={reader.id} className="border p-4 rounded shadow">
+              <li key={reader.id} className="border p-4 rounded shadow bg-gray-50">
                 <h3 className="text-md font-semibold">{reader.displayName}</h3>
                 <p className="text-sm text-gray-600">{reader.bio}</p>
                 <p className="text-sm italic text-gray-500 mt-1">
@@ -186,7 +333,7 @@ const ClientDashboard = () => {
                         {slots.map((slot) => (
                           <button
                             key={slot}
-                            onClick={() => handleBook(reader.id, slot)}
+                            onClick={() => handleBook(reader.id, slot, reader.displayName)}
                             className="bg-indigo-600 text-white text-xs px-3 py-1 rounded hover:bg-indigo-700 whitespace-nowrap flex-shrink-0"
                           >
                             {formatTime(slot)}
@@ -205,6 +352,7 @@ const ClientDashboard = () => {
       {/* Dev Patch */}
       <PatchReaders />
     </div>
+  </div>
   );
 };
 
